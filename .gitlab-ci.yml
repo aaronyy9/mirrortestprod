@@ -3,7 +3,9 @@ stages:
   - deploy
 
 variables:
-  IMAGE: "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"
+  HARBOR_REGISTRY: "harbor-prv.zen-x.com.cn"
+  HARBOR_REPO_PATH: "bmsdeploy/bms-deploy"
+  IMAGE: "$HARBOR_REGISTRY/$HARBOR_REPO_PATH:$CI_COMMIT_SHORT_SHA"
   CONTAINER_NAME: "bms-deploy"
   PORT: "3000"
 
@@ -12,7 +14,7 @@ build:
   tags:
     - prod-23
   script:
-    - docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD"
+    - docker login "$HARBOR_REGISTRY" -u "$HARBOR_USERNAME" -p "$HARBOR_PASSWORD"
     - docker build -t "$IMAGE" .
     - docker push "$IMAGE"
   rules:
@@ -25,7 +27,7 @@ deploy:
   needs:
     - build
   script:
-    - docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD"
+    - docker login "$HARBOR_REGISTRY" -u "$HARBOR_USERNAME" -p "$HARBOR_PASSWORD"
     - docker pull "$IMAGE"
     - docker rm -f "$CONTAINER_NAME" || true
     - docker run -d --name "$CONTAINER_NAME" --restart always -p ${PORT}:${PORT} -e PORT=${PORT} -e JENKINS_URL="$JENKINS_URL" -e JENKINS_JOB="$JENKINS_JOB" -e JENKINS_USER="$JENKINS_USER" -e JENKINS_TOKEN="$JENKINS_TOKEN" "$IMAGE"
