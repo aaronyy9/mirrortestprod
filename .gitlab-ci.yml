@@ -1,0 +1,35 @@
+stages:
+  - build
+  - deploy
+
+variables:
+  IMAGE: "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"
+  CONTAINER_NAME: "bms-deploy"
+  PORT: "3000"
+
+build:
+  stage: build
+  tags:
+    - prod-23
+  script:
+    - docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD"
+    - docker build -t "$IMAGE" .
+    - docker push "$IMAGE"
+  rules:
+    - if: "$CI_COMMIT_BRANCH == 'main'"
+
+deploy:
+  stage: deploy
+  tags:
+    - prod-23
+  needs:
+    - build
+  script:
+    - docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD"
+    - docker pull "$IMAGE"
+    - docker rm -f "$CONTAINER_NAME" || true
+    - docker run -d --name "$CONTAINER_NAME" --restart always -p ${PORT}:${PORT} -e PORT=${PORT} -e JENKINS_URL="$JENKINS_URL" -e JENKINS_JOB="$JENKINS_JOB" -e JENKINS_USER="$JENKINS_USER" -e JENKINS_TOKEN="$JENKINS_TOKEN" "$IMAGE"
+  rules:
+    - if: "$CI_COMMIT_BRANCH == 'main'"
+      when: manual
+      allow_failure: false
