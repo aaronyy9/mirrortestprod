@@ -1,0 +1,22 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.venv/
+venv/
+
+# Env & secrets
+.env
+*.secret
+*.key
+
+# Logs & runtime
+*.log
+
+# Build artifacts
+dist/
+build/
