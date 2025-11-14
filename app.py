@@ -49,8 +49,8 @@ def deploy():
             timeout=10,
         )
         if resp.status_code in (200, 201, 302):
-            return jsonify(message="Jenkins job triggered", target=target), 200
-        return jsonify(error="Jenkins error", detail=resp.text[:300]), resp.status_code
+            return jsonify(message="发布 job triggered", target=target), 200
+        return jsonify(error="发布 error", detail=resp.text[:300]), resp.status_code
     except Exception as e:
         return jsonify(error="Failed to call Jenkins", detail=str(e)), 500
 
