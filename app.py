@@ -9,15 +9,11 @@ load_dotenv(env_path)
 
 app = Flask(__name__)
 
+JENKINS_URL   = (os.getenv("JENKINS_URL") or "").rstrip("/")
+JENKINS_JOB   = os.getenv("JENKINS_JOB") or ""
+JENKINS_USER  = os.getenv("JENKINS_USER") or ""
+JENKINS_TOKEN = os.getenv("JENKINS_TOKEN") or ""
 VALID_TARGETS = {"all", "backend", "frontend"}
-
-def _get_jenkins_config():
-    url = (os.getenv("JENKINS_URL") or "").strip().rstrip("/")
-    job = (os.getenv("JENKINS_JOB") or "").strip()
-    user = (os.getenv("JENKINS_USER") or "").strip()
-    token = (os.getenv("JENKINS_TOKEN") or "").strip()
-    missing = [k for k, v in {"JENKINS_URL": url, "JENKINS_JOB": job, "JENKINS_USER": user, "JENKINS_TOKEN": token}.items() if not v]
-    return {"url": url, "job": job, "user": user, "token": token}, missing
 
 # ----------- 管理界面 -----------
 @app.route("/")
@@ -32,18 +28,24 @@ def deploy():
     if target not in VALID_TARGETS:
         return jsonify(error=f"deploy_target must be one of {VALID_TARGETS}"), 400
 
-    cfg, missing = _get_jenkins_config()
+    missing = []
+    if not JENKINS_URL:
+        missing.append("JENKINS_URL")
+    if not JENKINS_JOB:
+        missing.append("JENKINS_JOB")
+    if not JENKINS_USER:
+        missing.append("JENKINS_USER")
+    if not JENKINS_TOKEN:
+        missing.append("JENKINS_TOKEN")
     if missing:
-        return jsonify(error="Missing Jenkins configuration", missing=missing), 500
-    if not (cfg["url"].startswith("http://") or cfg["url"].startswith("https://")):
-        return jsonify(error="Invalid JENKINS_URL", value=cfg["url"]), 400
+        return jsonify(error="Missing required env", fields=missing), 500
 
-    build_url = f"{cfg['url']}/job/{cfg['job']}/buildWithParameters"
+    build_url = f"{JENKINS_URL}/job/{JENKINS_JOB}/buildWithParameters"
     try:
         resp = requests.post(
             build_url,
             params={"DEPLOY_TARGET": target},
-            auth=(cfg["user"], cfg["token"]),
+            auth=(JENKINS_USER, JENKINS_TOKEN),
             timeout=10,
         )
         if resp.status_code in (200, 201, 302):

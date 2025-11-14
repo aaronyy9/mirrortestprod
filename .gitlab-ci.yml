@@ -8,7 +8,6 @@ variables:
   IMAGE: "$HARBOR_REGISTRY/$HARBOR_REPO_PATH:$CI_COMMIT_SHORT_SHA"
   CONTAINER_NAME: "bms-deploy"
   PORT: "3000"
-  ENV_FILE_PATH: "/opt/bms-deploy/.env"
 
 build:
   stage: build
@@ -19,7 +18,7 @@ build:
     - docker build -t "$IMAGE" .
     - docker push "$IMAGE"
   rules:
-    - when: always
+    - if: "$CI_COMMIT_BRANCH == 'main'"
 
 deploy:
   stage: deploy
@@ -31,17 +30,6 @@ deploy:
     - docker login "$HARBOR_REGISTRY" -u "$HARBOR_USERNAME" -p "$HARBOR_PASSWORD"
     - docker pull "$IMAGE"
     - docker rm -f "$CONTAINER_NAME" || true
-    - |
-      if [ -f "$ENV_FILE_PATH" ]; then
-        docker run -d --name "$CONTAINER_NAME" --restart always \
-          --env-file "$ENV_FILE_PATH" -e PORT=${PORT} -p ${PORT}:${PORT} "$IMAGE"
-      else
-        docker run -d --name "$CONTAINER_NAME" --restart always \
-          -e PORT=${PORT} -p ${PORT}:${PORT} \
-          -e JENKINS_URL="$JENKINS_URL" -e JENKINS_JOB="$JENKINS_JOB" -e JENKINS_USER="$JENKINS_USER" -e JENKINS_TOKEN="$JENKINS_TOKEN" \
-          "$IMAGE"
-      fi
+    - docker run -d --name "$CONTAINER_NAME" --restart always -p ${PORT}:${PORT} -e PORT=${PORT} -e JENKINS_URL="$JENKINS_URL" -e JENKINS_JOB="$JENKINS_JOB" -e JENKINS_USER="$JENKINS_USER" -e JENKINS_TOKEN="$JENKINS_TOKEN" "$IMAGE"
   rules:
-    - if: "$CI_COMMIT_BRANCH == 'main'"
-      when: manual
-      allow_failure: false
+    - if: "$CI_COMMIT_BRANCH == 'main'"      when: manual
