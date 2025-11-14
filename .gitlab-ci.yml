@@ -32,4 +32,4 @@ deploy:
     - docker rm -f "$CONTAINER_NAME" || true
     - docker run -d --name "$CONTAINER_NAME" --restart always -p ${PORT}:${PORT} -e PORT=${PORT} -e JENKINS_URL="$JENKINS_URL" -e JENKINS_JOB="$JENKINS_JOB" -e JENKINS_USER="$JENKINS_USER" -e JENKINS_TOKEN="$JENKINS_TOKEN" "$IMAGE"
   rules:
-    - if: "$CI_COMMIT_BRANCH == 'main'"      when: manual
+    - if: "$CI_COMMIT_BRANCH == 'main'"
