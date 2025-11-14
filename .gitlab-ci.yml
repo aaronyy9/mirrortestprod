@@ -30,6 +30,16 @@ deploy:
     - docker login "$HARBOR_REGISTRY" -u "$HARBOR_USERNAME" -p "$HARBOR_PASSWORD"
     - docker pull "$IMAGE"
     - docker rm -f "$CONTAINER_NAME" || true
-    - docker run -d --name "$CONTAINER_NAME" --restart always -p ${PORT}:${PORT} -e PORT=${PORT} -e JENKINS_URL="$JENKINS_URL" -e JENKINS_JOB="$JENKINS_JOB" -e JENKINS_USER="$JENKINS_USER" -e JENKINS_TOKEN="$JENKINS_TOKEN" "$IMAGE"
+    - |
+      ENV_OPTS=""
+      if [ -n "$ENV_FILE_PATH" ] && [ -f "$ENV_FILE_PATH" ]; then
+        ENV_OPTS="--env-file $ENV_FILE_PATH"
+      else
+        [ -n "$JENKINS_URL" ] && ENV_OPTS="$ENV_OPTS -e JENKINS_URL=$JENKINS_URL"
+        [ -n "$JENKINS_JOB" ] && ENV_OPTS="$ENV_OPTS -e JENKINS_JOB=$JENKINS_JOB"
+        [ -n "$JENKINS_USER" ] && ENV_OPTS="$ENV_OPTS -e JENKINS_USER=$JENKINS_USER"
+        [ -n "$JENKINS_TOKEN" ] && ENV_OPTS="$ENV_OPTS -e JENKINS_TOKEN=$JENKINS_TOKEN"
+      fi
+      docker run -d --name "$CONTAINER_NAME" --restart always -p ${PORT}:${PORT} -e PORT=${PORT} $ENV_OPTS "$IMAGE"
   rules:
     - if: "$CI_COMMIT_BRANCH == 'main'"

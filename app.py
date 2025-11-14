@@ -5,7 +5,7 @@ import requests
 from dotenv import load_dotenv
 
 env_path = Path(__file__).with_name(".env")
-load_dotenv(env_path)
+load_dotenv(env_path, override=True)
 
 app = Flask(__name__)
 
