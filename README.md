@@ -4,5 +4,7 @@
 发布地址：https://jks-deploy.depzen.com/  访问方式 depz zenx2022
 使用gitlab自动发布程序到内网23
 
+test to prod
+
 ### 2025-11-18 add by aaronyou 建立其他目录other，用于存放bms的其他脚本
 1. up.sh test环境升级脚本
