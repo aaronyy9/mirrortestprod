@@ -5,20 +5,51 @@ stages:
 variables:
   HARBOR_REGISTRY: "harbor-prv.zen-x.com.cn"
   HARBOR_REPO_PATH: "bmsdeploy/bms-deploy"
-  IMAGE: "$HARBOR_REGISTRY/$HARBOR_REPO_PATH:$CI_COMMIT_SHORT_SHA"
   CONTAINER_NAME: "bms-deploy"
   PORT: "3000"
+  RELEASE_SCOPE: "patch"
 
 build:
   stage: build
   tags:
     - prod-23
   script:
+    - set -e
+    - git fetch --tags --force || true
+    - LATEST=$(git tag --list "v*" | sort -V | tail -n 1 || true)
+    - if [ -z "$LATEST" ]; then NEXT_VERSION="v1.0.0"; else \
+        MAJOR=$(echo "$LATEST" | sed 's/^v//' | cut -d. -f1); \
+        MINOR=$(echo "$LATEST" | sed 's/^v//' | cut -d. -f2); \
+        PATCH=$(echo "$LATEST" | sed 's/^v//' | cut -d. -f3); \
+        case "$RELEASE_SCOPE" in \
+          major) NEXT_VERSION="v$((MAJOR+1)).0.0" ;; \
+          minor) NEXT_VERSION="v${MAJOR}.$((MINOR+1)).0" ;; \
+          *) NEXT_VERSION="v${MAJOR}.${MINOR}.$((PATCH+1))" ;; \
+        esac; \
+      fi
+    - DATE_TAG="$(date +%Y%m%d)-${CI_COMMIT_SHORT_SHA}"
+    - echo "$NEXT_VERSION" > version.txt
     - docker login "$HARBOR_REGISTRY" -u "$HARBOR_USERNAME" -p "$HARBOR_PASSWORD"
-    - docker build -t "$IMAGE" .
-    - docker push "$IMAGE"
+    - docker build -t "$HARBOR_REGISTRY/$HARBOR_REPO_PATH:$NEXT_VERSION" -t "$HARBOR_REGISTRY/$HARBOR_REPO_PATH:$DATE_TAG" .
+    - docker push "$HARBOR_REGISTRY/$HARBOR_REPO_PATH:$NEXT_VERSION"
+    - docker push "$HARBOR_REGISTRY/$HARBOR_REPO_PATH:$DATE_TAG"
+    - |
+      if [ -n "$GITLAB_API_TOKEN" ]; then
+        curl --fail -s --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" \
+          --data "tag_name=$NEXT_VERSION&ref=$CI_COMMIT_SHA" \
+          "$CI_API_V4_URL/projects/$CI_PROJECT_ID/repository/tags" || true
+      else
+        echo "GITLAB_API_TOKEN not set; skipping git tag creation"
+      fi
+  artifacts:
+    paths:
+      - version.txt
+    expire_in: 7 days
   rules:
-    - if: "$CI_COMMIT_BRANCH == 'main'"
+    - if: '$CI_COMMIT_BRANCH == "main" && $RELEASE_SCOPE == "major"'
+      when: manual
+      allow_failure: false
+    - if: '$CI_COMMIT_BRANCH == "main"'
 
 deploy:
   stage: deploy
@@ -27,8 +58,10 @@ deploy:
   needs:
     - build
   script:
+    - set -e
+    - NEXT_VERSION=$(cat version.txt)
     - docker login "$HARBOR_REGISTRY" -u "$HARBOR_USERNAME" -p "$HARBOR_PASSWORD"
-    - docker pull "$IMAGE"
+    - docker pull "$HARBOR_REGISTRY/$HARBOR_REPO_PATH:$NEXT_VERSION"
     - docker rm -f "$CONTAINER_NAME" || true
     - |
       ENV_OPTS=""
@@ -40,6 +73,6 @@ deploy:
         [ -n "$JENKINS_USER" ] && ENV_OPTS="$ENV_OPTS -e JENKINS_USER=$JENKINS_USER"
         [ -n "$JENKINS_TOKEN" ] && ENV_OPTS="$ENV_OPTS -e JENKINS_TOKEN=$JENKINS_TOKEN"
       fi
-      docker run -d --name "$CONTAINER_NAME" --restart always -p ${PORT}:${PORT} -e PORT=${PORT} $ENV_OPTS "$IMAGE"
+      docker run -d --name "$CONTAINER_NAME" --restart always -p ${PORT}:${PORT} -e PORT=${PORT} $ENV_OPTS "$HARBOR_REGISTRY/$HARBOR_REPO_PATH:$NEXT_VERSION"
   rules:
-    - if: "$CI_COMMIT_BRANCH == 'main'"
+    - if: '$CI_COMMIT_BRANCH == "main"'
