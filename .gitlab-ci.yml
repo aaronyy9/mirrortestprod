@@ -17,15 +17,18 @@ build:
     - set -e
     - git fetch --tags --force || true
     - LATEST=$(git tag --list "v*" | sort -V | tail -n 1 || true)
-    - if [ -z "$LATEST" ]; then NEXT_VERSION="v1.0.0"; else \
-        MAJOR=$(echo "$LATEST" | sed 's/^v//' | cut -d. -f1); \
-        MINOR=$(echo "$LATEST" | sed 's/^v//' | cut -d. -f2); \
-        PATCH=$(echo "$LATEST" | sed 's/^v//' | cut -d. -f3); \
-        case "$RELEASE_SCOPE" in \
-          major) NEXT_VERSION="v$((MAJOR+1)).0.0" ;; \
-          minor) NEXT_VERSION="v${MAJOR}.$((MINOR+1)).0" ;; \
-          *) NEXT_VERSION="v${MAJOR}.${MINOR}.$((PATCH+1))" ;; \
-        esac; \
+    - |
+      if [ -z "$LATEST" ]; then
+        NEXT_VERSION="v1.0.0"
+      else
+        MAJOR=$(echo "$LATEST" | sed 's/^v//' | cut -d. -f1)
+        MINOR=$(echo "$LATEST" | sed 's/^v//' | cut -d. -f2)
+        PATCH=$(echo "$LATEST" | sed 's/^v//' | cut -d. -f3)
+        case "$RELEASE_SCOPE" in
+          major) NEXT_VERSION="v$((MAJOR+1)).0.0" ;;
+          minor) NEXT_VERSION="v${MAJOR}.$((MINOR+1)).0" ;;
+          *) NEXT_VERSION="v${MAJOR}.${MINOR}.$((PATCH+1))" ;;
+        esac
       fi
     - DATE_TAG="$(date +%Y%m%d)-${CI_COMMIT_SHORT_SHA}"
     - echo "$NEXT_VERSION" > version.txt
