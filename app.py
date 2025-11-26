@@ -14,6 +14,14 @@ JENKINS_JOB   = os.getenv("JENKINS_JOB") or ""
 JENKINS_USER  = os.getenv("JENKINS_USER") or ""
 JENKINS_TOKEN = os.getenv("JENKINS_TOKEN") or ""
 VALID_TARGETS = {"all", "backend", "frontend"}
+PROJECTS = {
+    "bms": {"jobs_env": True, "jobs": []},
+    "standard_demo": {"jobs_env": False, "jobs": [
+        "standard-account-demo-backend",
+        "standard-aiquery-demo-backend",
+        "standard-aiaccount-demo-web-Docker-quick",
+    ]},
+}
 
 # ----------- 管理界面 -----------
 @app.route("/")
@@ -24,35 +32,54 @@ def index():
 @app.route("/deploy", methods=["POST"])
 def deploy():
     body = request.get_json(silent=True) or {}
-    target = body.get("deploy_target", "all").strip().lower()
+    project = (body.get("project") or "bms").strip().lower()
+    target = (body.get("deploy_target") or "all").strip().lower()
     if target not in VALID_TARGETS:
         return jsonify(error=f"deploy_target must be one of {VALID_TARGETS}"), 400
+    if project not in PROJECTS:
+        return jsonify(error="invalid project", projects=list(PROJECTS.keys())), 400
 
     missing = []
     if not JENKINS_URL:
         missing.append("JENKINS_URL")
-    if not JENKINS_JOB:
-        missing.append("JENKINS_JOB")
     if not JENKINS_USER:
         missing.append("JENKINS_USER")
     if not JENKINS_TOKEN:
         missing.append("JENKINS_TOKEN")
+    if PROJECTS[project]["jobs_env"] and not JENKINS_JOB:
+        missing.append("JENKINS_JOB")
     if missing:
         return jsonify(error="Missing required env", fields=missing), 500
 
-    build_url = f"{JENKINS_URL}/job/{JENKINS_JOB}/buildWithParameters"
-    try:
-        resp = requests.post(
-            build_url,
-            params={"DEPLOY_TARGET": target},
-            auth=(JENKINS_USER, JENKINS_TOKEN),
-            timeout=10,
-        )
-        if resp.status_code in (200, 201, 302):
-            return jsonify(message="发布 job triggered", target=target), 200
-        return jsonify(error="发布 error", detail=resp.text[:300]), resp.status_code
-    except Exception as e:
-        return jsonify(error="Failed to call Jenkins", detail=str(e)), 500
+    jobs = []
+    if PROJECTS[project]["jobs_env"]:
+        jobs = [JENKINS_JOB]
+    else:
+        jobs = PROJECTS[project]["jobs"]
+    if not jobs:
+        return jsonify(error="no jobs configured"), 500
+
+    results = []
+    ok = True
+    for job in jobs:
+        build_url = f"{JENKINS_URL}/job/{job}/buildWithParameters"
+        try:
+            resp = requests.post(
+                build_url,
+                params={"DEPLOY_TARGET": target},
+                auth=(JENKINS_USER, JENKINS_TOKEN),
+                timeout=10,
+            )
+            r = {"job": job, "status": resp.status_code, "ok": resp.status_code in (200, 201, 302)}
+            results.append(r)
+            if not r["ok"]:
+                ok = False
+        except Exception as e:
+            results.append({"job": job, "error": str(e), "ok": False})
+            ok = False
+    if ok:
+        return jsonify(message="jobs triggered", project=project, target=target, results=results), 200
+    return jsonify(error="some jobs failed", project=project, target=target, results=results), 500
 
 # ----------- 健康检查 -----------
 @app.route("/ping")

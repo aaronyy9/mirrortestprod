@@ -14,6 +14,13 @@
     <div class="card-body">
       <form id="deployForm">
         <div class="mb-3">
+          <label for="project" class="form-label">发布项目</label>
+          <select class="form-select" id="project" required>
+            <option value="bms">bms</option>
+            <option value="standard_demo">standand_demo</option>
+          </select>
+        </div>
+        <div class="mb-3">
           <label for="target" class="form-label">发布范围</label>
           <select class="form-select" id="target" required>
             <option value="all">all</option>
@@ -21,7 +28,6 @@
             <option value="frontend">frontend</option>
           </select>
         </div>
-
         <button type="submit" class="btn btn-primary w-100">发布</button>
       </form>
     </div>
@@ -44,7 +50,8 @@ document.getElementById('deployForm').addEventListener('submit', async (e) => {
     const res = await fetch('/deploy', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({deploy_target: target})
+      const project = document.getElementById('project').value;
+      body: JSON.stringify({project, deploy_target: target})
     });
     const data = await res.json();
     showAlert(res.ok ? 'success' : 'danger', data.message || data.error);
