@@ -10,4 +10,4 @@ test to prod
 1. up.sh test环境升级脚本
 
 ### 2025-11-26 add by aaronyou
-新增功能更完善的升级脚本
+新增功能更完善的升级脚本：增加标准版-demo的发布
