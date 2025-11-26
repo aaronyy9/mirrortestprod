@@ -38,19 +38,47 @@
 </div>
 
 <script>
+const TARGET_OPTIONS = {
+  bms: [
+    {value:'all',label:'all'},
+    {value:'backend',label:'backend'},
+    {value:'frontend',label:'frontend'},
+  ],
+  standard_demo: [
+    {value:'standard-account-demo-backend',label:'standard-account-demo-backend'},
+    {value:'standard-aiquery-demo-backend',label:'standard-aiquery-demo-backend'},
+    {value:'standard-aiaccount-demo-web-Docker-quick',label:'standard-aiaccount-demo-web-Docker-quick'},
+  ],
+};
+
+function renderTargets(project){
+  const sel = document.getElementById('target');
+  sel.innerHTML = '';
+  TARGET_OPTIONS[project].forEach(opt => {
+    const o = document.createElement('option');
+    o.value = opt.value; o.textContent = opt.label;
+    sel.appendChild(o);
+  });
+}
+
+document.getElementById('project').addEventListener('change', (e)=>{
+  renderTargets(e.target.value);
+});
+
+// initialize
+renderTargets(document.getElementById('project').value);
+
 document.getElementById('deployForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-
+  const project = document.getElementById('project').value;
   const target = document.getElementById('target').value;
   const btn = e.target.querySelector('button');
   btn.disabled = true;
   btn.textContent = '发布中...';
-
   try {
     const res = await fetch('/deploy', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      const project = document.getElementById('project').value;
       body: JSON.stringify({project, deploy_target: target})
     });
     const data = await res.json();
