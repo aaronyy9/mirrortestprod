@@ -8,3 +8,6 @@ test to prod
 
 ### 2025-11-18 add by aaronyou 建立其他目录other，用于存放bms的其他脚本
 1. up.sh test环境升级脚本
+
+### 2025-11-26 add by aaronyou
+新增功能更完善的升级脚本
