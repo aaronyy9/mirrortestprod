@@ -18,6 +18,8 @@ build:
     - set -e
     - git fetch --tags --force || true
     - LATEST=$(git tag --list "v*" | sort -V | tail -n 1 || true)
+    - echo "Latest tag: $LATEST"
+    - echo "GITLAB_API_TOKEN: $GITLAB_API_TOKEN"
     - |
       if [ -z "$LATEST" ]; then
         NEXT_VERSION="v1.0.0"
