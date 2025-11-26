@@ -17,10 +17,10 @@ build:
   script:
     - set -e
     - git fetch --tags --force || true
-    - LATEST=$(git tag --list "v*" | sort -V | tail -n 1 || true)
-    - echo "Latest tag: $LATEST"
-    - echo "GITLAB_API_TOKEN: $GITLAB_API_TOKEN"
     - |
+      LATEST=$(git tag --list "v*" | sort -V | tail -n 1 || true)
+      echo "Latest tag: $LATEST"
+      echo "RELEASE_SCOPE: $RELEASE_SCOPE"
       if [ -z "$LATEST" ]; then
         NEXT_VERSION="v1.0.0"
       else
@@ -33,6 +33,8 @@ build:
           *) NEXT_VERSION="v${MAJOR}.${MINOR}.$((PATCH+1))" ;;
         esac
       fi
+      echo "NEXT_VERSION: $NEXT_VERSION"
+      echo "GITLAB_API_TOKEN set?: $( [ -n "$GITLAB_API_TOKEN" ] && echo yes || echo no )"
     - DATE_TAG="$(date +%Y%m%d)-${CI_COMMIT_SHORT_SHA}"
     - echo "$NEXT_VERSION" > version.txt
     - docker login "$HARBOR_REGISTRY" -u "$HARBOR_USERNAME" -p "$HARBOR_PASSWORD"
@@ -41,11 +43,28 @@ build:
     - docker push "$HARBOR_REGISTRY/$HARBOR_REPO_PATH:$DATE_TAG"
     - |
       if [ -n "$GITLAB_API_TOKEN" ]; then
+        set +e
         curl --fail -s --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" \
           --data "tag_name=$NEXT_VERSION&ref=$CI_COMMIT_SHA" \
-          "$CI_API_V4_URL/projects/$CI_PROJECT_ID/repository/tags" || true
+          "$CI_API_V4_URL/projects/$CI_PROJECT_ID/repository/tags"
+        RC=$?
+        set -e
+        if [ $RC -ne 0 ]; then
+          echo "API tag creation failed (code $RC), attempting git push fallback"
+          if [ "$ENABLE_PUSH_TAG" = "1" ] && [ -n "$CI_JOB_TOKEN" ]; then
+            git config user.name "gitlab-ci"
+            git config user.email "ci@example.local"
+            git remote set-url origin "https://oauth2:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+            git tag -a "$NEXT_VERSION" -m "release $NEXT_VERSION" || true
+            git push origin "$NEXT_VERSION" || true
+          else
+            echo "Fallback disabled or CI_JOB_TOKEN missing; skipping git tag push"
+          fi
+        else
+          echo "API tag created: $NEXT_VERSION"
+        fi
       else
-        echo "GITLAB_API_TOKEN not set; skipping git tag creation via API"
+        echo "GITLAB_API_TOKEN not set; using fallback if enabled"
         if [ "$ENABLE_PUSH_TAG" = "1" ] && [ -n "$CI_JOB_TOKEN" ]; then
           git config user.name "gitlab-ci"
           git config user.email "ci@example.local"
