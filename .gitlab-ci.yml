@@ -7,7 +7,7 @@ variables:
   HARBOR_REPO_PATH: "bmsdeploy/bms-deploy"
   CONTAINER_NAME: "bms-deploy"
   PORT: "3000"
-  RELEASE_SCOPE: "patch"
+  RELEASE_SCOPE: "major"
   ENABLE_PUSH_TAG: "0"
 
 build:
