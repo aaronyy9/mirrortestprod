@@ -13,10 +13,14 @@ JENKINS_URL   = (os.getenv("JENKINS_URL") or "").rstrip("/")
 JENKINS_JOB   = os.getenv("JENKINS_JOB") or ""
 JENKINS_USER  = os.getenv("JENKINS_USER") or ""
 JENKINS_TOKEN = os.getenv("JENKINS_TOKEN") or ""
-VALID_TARGETS = {"all", "backend", "frontend"}
 PROJECTS = {
-    "bms": {"jobs_env": True, "jobs": []},
-    "standard_demo": {"jobs_env": False, "jobs": [
+    "bms": {"targets": {"all", "backend", "frontend"}, "jobs_env": True, "jobs": []},
+    "standard_demo": {"targets": {
+        "all",
+        "standard-account-demo-backend",
+        "standard-aiquery-demo-backend",
+        "standard-aiaccount-demo-web-Docker-quick",
+    }, "jobs_env": False, "jobs": [
         "standard-account-demo-backend",
         "standard-aiquery-demo-backend",
         "standard-aiaccount-demo-web-Docker-quick",
@@ -33,11 +37,11 @@ def index():
 def deploy():
     body = request.get_json(silent=True) or {}
     project = (body.get("project") or "bms").strip().lower()
-    target = (body.get("deploy_target") or "all").strip().lower()
-    if target not in VALID_TARGETS:
-        return jsonify(error=f"deploy_target must be one of {VALID_TARGETS}"), 400
+    target = (body.get("deploy_target") or "all").strip()
     if project not in PROJECTS:
         return jsonify(error="invalid project", projects=list(PROJECTS.keys())), 400
+    if target not in PROJECTS[project]["targets"]:
+        return jsonify(error=f"invalid target", targets=list(PROJECTS[project]["targets"])), 400
 
     missing = []
     if not JENKINS_URL:
@@ -55,7 +59,10 @@ def deploy():
     if PROJECTS[project]["jobs_env"]:
         jobs = [JENKINS_JOB]
     else:
-        jobs = PROJECTS[project]["jobs"]
+        if target == "all":
+            jobs = PROJECTS[project]["jobs"]
+        else:
+            jobs = [target]
     if not jobs:
         return jsonify(error="no jobs configured"), 500
 
@@ -64,9 +71,10 @@ def deploy():
     for job in jobs:
         build_url = f"{JENKINS_URL}/job/{job}/buildWithParameters"
         try:
+            params = {"DEPLOY_TARGET": target} if project == "bms" else {}
             resp = requests.post(
                 build_url,
-                params={"DEPLOY_TARGET": target},
+                params=params,
                 auth=(JENKINS_USER, JENKINS_TOKEN),
                 timeout=10,
             )
