@@ -72,8 +72,8 @@ def _log_deploy(project, target, version, image_version, date_sha, commit_sha, j
             cur.execute(sql, (
                 project,
                 target,
-                version or None,
-                image_version or None,
+                version,
+                image_version,
                 date_sha or None,
                 commit_sha or None,
                 json.dumps(jobs, ensure_ascii=False),
@@ -151,15 +151,16 @@ def deploy():
         except Exception as e:
             results.append({"job": job, "error": str(e), "ok": False})
             ok = False
-    version = os.getenv("APP_VERSION") or os.getenv("IMAGE_VERSION") or os.getenv("NEXT_VERSION") or ""
+    version = os.getenv("APP_VERSION") or os.getenv("IMAGE_VERSION") or os.getenv("NEXT_VERSION") or os.getenv("VERSION") or "unknown"
+    image_version = version
     date_sha = os.getenv("IMAGE_DATE_TAG") or ""
     commit_sha = os.getenv("CI_COMMIT_SHA") or ""
     runner_host = os.getenv("HOSTNAME") or socket.gethostname()
     triggered_by = request.headers.get("X-User") or os.getenv("CI_JOB_USER") or os.getenv("GITLAB_USER_LOGIN") or ""
     if ok:
-        _log_deploy(project, target, version, version, date_sha, commit_sha, results, True, 200, "jobs triggered", runner_host, triggered_by)
+        _log_deploy(project, target, version, image_version, date_sha, commit_sha, results, True, 200, "jobs triggered", runner_host, triggered_by)
         return jsonify(message="jobs triggered", project=project, target=target, results=results), 200
-    _log_deploy(project, target, version, version, date_sha, commit_sha, results, False, 500, "some jobs failed", runner_host, triggered_by)
+    _log_deploy(project, target, version, image_version, date_sha, commit_sha, results, False, 500, "some jobs failed", runner_host, triggered_by)
     return jsonify(error="some jobs failed", project=project, target=target, results=results), 500
 
 # ----------- 健康检查 -----------
