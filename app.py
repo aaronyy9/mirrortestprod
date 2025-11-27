@@ -1,8 +1,9 @@
-import os, json
+import os, json, socket
 from pathlib import Path
 from flask import Flask, request, jsonify, render_template
 import requests
 from dotenv import load_dotenv
+import pymysql
 
 env_path = Path(__file__).with_name(".env")
 load_dotenv(env_path, override=True)
@@ -33,6 +34,58 @@ PROJECTS = {
         "standand-trial-prod-all",
     ]},
 }
+
+DB_HOST = os.getenv("DB_HOST") or ""
+DB_PORT = int(os.getenv("DB_PORT") or "3306")
+DB_USER = os.getenv("DB_USER") or ""
+DB_PASSWORD = os.getenv("DB_PASSWORD") or ""
+DB_NAME = os.getenv("DB_NAME") or "jkslogs"
+
+def _db_conn():
+    if not (DB_HOST and DB_USER and DB_PASSWORD and DB_NAME):
+        return None
+    return pymysql.connect(
+        host=DB_HOST,
+        port=DB_PORT,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME,
+        charset="utf8mb4",
+        autocommit=True,
+    )
+
+def _log_deploy(project, target, version, image_version, date_sha, commit_sha, jobs, ok, status_code, message, runner_host, triggered_by):
+    conn = _db_conn()
+    if not conn:
+        return False
+    try:
+        with conn.cursor() as cur:
+            sql = (
+                "INSERT INTO deploy_logs (project, target, version, image_tag_version, image_tag_date_sha, commit_sha, jenkins_jobs, ok, status_code, message, runner_host, triggered_by) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+            )
+            cur.execute(sql, (
+                project,
+                target,
+                version or None,
+                image_version or None,
+                date_sha or None,
+                commit_sha or None,
+                json.dumps(jobs, ensure_ascii=False),
+                int(bool(ok)),
+                status_code,
+                message,
+                runner_host or None,
+                triggered_by or None,
+            ))
+        return True
+    except Exception:
+        return False
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 # ----------- 管理界面 -----------
 @app.route("/")
@@ -92,8 +145,15 @@ def deploy():
         except Exception as e:
             results.append({"job": job, "error": str(e), "ok": False})
             ok = False
+    version = os.getenv("APP_VERSION") or os.getenv("IMAGE_VERSION") or os.getenv("NEXT_VERSION") or ""
+    date_sha = os.getenv("IMAGE_DATE_TAG") or ""
+    commit_sha = os.getenv("CI_COMMIT_SHA") or ""
+    runner_host = os.getenv("HOSTNAME") or socket.gethostname()
+    triggered_by = request.headers.get("X-User") or os.getenv("CI_JOB_USER") or os.getenv("GITLAB_USER_LOGIN") or ""
     if ok:
+        _log_deploy(project, target, version, version, date_sha, commit_sha, results, True, 200, "jobs triggered", runner_host, triggered_by)
         return jsonify(message="jobs triggered", project=project, target=target, results=results), 200
+    _log_deploy(project, target, version, version, date_sha, commit_sha, results, False, 500, "some jobs failed", runner_host, triggered_by)
     return jsonify(error="some jobs failed", project=project, target=target, results=results), 500
 
 # ----------- 健康检查 -----------
