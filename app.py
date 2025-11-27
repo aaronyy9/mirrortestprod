@@ -25,6 +25,13 @@ PROJECTS = {
         "standard-aiquery-demo-backend",
         "standard-aiaccount-demo-web-Docker-quick",
     ]},
+    "standand_standard": {"targets": {
+        "standand-ali-prod-all",
+        "standand-trial-prod-all",
+    }, "jobs_env": False, "jobs": [
+        "standand-ali-prod-all",
+        "standand-trial-prod-all",
+    ]},
 }
 
 # ----------- 管理界面 -----------
