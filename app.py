@@ -43,16 +43,21 @@ DB_NAME = os.getenv("DB_NAME") or "jkslogs"
 
 def _db_conn():
     if not (DB_HOST and DB_USER and DB_PASSWORD and DB_NAME):
+        print("DB env missing: DB_HOST/DB_USER/DB_PASSWORD/DB_NAME")
         return None
-    return pymysql.connect(
-        host=DB_HOST,
-        port=DB_PORT,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME,
-        charset="utf8mb4",
-        autocommit=True,
-    )
+    try:
+        return pymysql.connect(
+            host=DB_HOST,
+            port=DB_PORT,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME,
+            charset="utf8mb4",
+            autocommit=True,
+        )
+    except Exception as e:
+        print(f"DB connect error: {e}")
+        return None
 
 def _log_deploy(project, target, version, image_version, date_sha, commit_sha, jobs, ok, status_code, message, runner_host, triggered_by):
     conn = _db_conn()
@@ -79,7 +84,8 @@ def _log_deploy(project, target, version, image_version, date_sha, commit_sha, j
                 triggered_by or None,
             ))
         return True
-    except Exception:
+    except Exception as e:
+        print(f"DB insert error: {e}")
         return False
     finally:
         try:
